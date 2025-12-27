@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "android-ui-agent": {
+      "command": "/home/physics91/dev/android-tester/.venv/bin/python",
+      "args": ["/home/physics91/dev/android-tester/src/server.py"]
+    }
+  }
+}

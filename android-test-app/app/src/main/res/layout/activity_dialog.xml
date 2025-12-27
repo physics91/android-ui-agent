@@ -1,0 +1,41 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <Button
+        android:id="@+id/btn_alert"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Show Alert"
+        android:textAllCaps="false" />
+
+    <Button
+        android:id="@+id/btn_bottom_sheet"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Show Bottom Sheet"
+        android:textAllCaps="false" />
+
+    <Button
+        android:id="@+id/btn_date_picker"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Show Date Picker"
+        android:textAllCaps="false" />
+
+    <Button
+        android:id="@+id/btn_time_picker"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Show Time Picker"
+        android:textAllCaps="false" />
+
+    <TextView
+        android:id="@+id/dialog_result"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Result:"
+        android:paddingTop="8dp" />
+</LinearLayout>

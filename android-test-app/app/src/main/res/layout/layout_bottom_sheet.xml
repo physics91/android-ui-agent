@@ -1,0 +1,18 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Bottom Sheet" />
+
+    <Button
+        android:id="@+id/btn_sheet_ok"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Sheet OK"
+        android:textAllCaps="false" />
+</LinearLayout>

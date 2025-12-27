@@ -1,0 +1,20 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <Button
+        android:id="@+id/btn_open_document"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Open Document"
+        android:textAllCaps="false" />
+
+    <TextView
+        android:id="@+id/text_file_result"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Result:"
+        android:paddingTop="8dp" />
+</LinearLayout>

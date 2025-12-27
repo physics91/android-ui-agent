@@ -1,0 +1,27 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <Button
+        android:id="@+id/btn_run_js"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Run JS"
+        android:textAllCaps="false" />
+
+    <TextView
+        android:id="@+id/text_web_result"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Web Result:"
+        android:paddingTop="8dp" />
+
+    <WebView
+        android:id="@+id/web_view"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="8dp" />
+</LinearLayout>
