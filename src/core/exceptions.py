@@ -4,6 +4,7 @@ Exception Hierarchy:
     AndroidAgentError (base)
     ├── DeviceConnectionError
     │   ├── DeviceNotFoundError
+    │   ├── MultipleDevicesError
     │   └── InvalidDeviceIdError
     ├── RefError
     │   ├── StaleRefError
@@ -53,6 +54,16 @@ class DeviceNotFoundError(DeviceConnectionError):
         else:
             message = "No Android devices connected"
         super().__init__(device_id or "none", message)
+
+
+class MultipleDevicesError(DeviceConnectionError):
+    """Multiple devices connected; selection required."""
+
+    def __init__(self, device_ids: list[str]):
+        message = "Multiple devices connected. Select a device_id."
+        super().__init__("multiple", message)
+        self.details.update({"device_ids": device_ids[:5]})
+        self.device_ids = device_ids
 
 
 class InvalidDeviceIdError(AndroidAgentError):

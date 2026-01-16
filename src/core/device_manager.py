@@ -19,6 +19,7 @@ from .exceptions import (
     DeviceConnectionError,
     DeviceNotFoundError,
     InvalidDeviceIdError,
+    MultipleDevicesError,
 )
 
 logger = logging.getLogger(__name__)
@@ -206,6 +207,38 @@ class DeviceManager:
         with self._selection_lock:
             return self._selected_device
 
+    def _normalize_device_id(self, device_id: Optional[str]) -> Optional[str]:
+        """Normalize device_id input to avoid passing sentinel values downstream."""
+        if device_id == "default":
+            return None
+        return device_id
+
+    def _resolve_device_id_with_policy(self, device_id: Optional[str]) -> Optional[str]:
+        """Resolve device ID using selection and auto-single-device policy.
+
+        Policy:
+        - If device_id is provided (and not "default"), use it.
+        - Else if a device is selected, use it.
+        - Else if exactly one device is available, use it.
+        - Else if multiple devices are available, raise MultipleDevicesError.
+        - Else return None (no devices).
+        """
+        normalized = self._normalize_device_id(device_id)
+        if normalized is not None:
+            return normalized
+
+        selected = self.get_selected_device()
+        if selected:
+            return selected
+
+        devices = self.get_available_devices()
+        if not devices:
+            return None
+        if len(devices) == 1:
+            return devices[0].serial
+
+        raise MultipleDevicesError([d.serial for d in devices])
+
     def resolve_device_id(self, device_id: Optional[str]) -> Optional[str]:
         """Resolve device ID, using selected device if None.
 
@@ -215,8 +248,9 @@ class DeviceManager:
         Returns:
             Resolved device ID (may still be None for default)
         """
-        if device_id is not None:
-            return device_id
+        normalized = self._normalize_device_id(device_id)
+        if normalized is not None:
+            return normalized
         return self.get_selected_device()
 
     def resolve_device_id_or_default(self, device_id: Optional[str]) -> str:
@@ -224,8 +258,12 @@ class DeviceManager:
 
         This keeps a consistent cache key and snapshot namespace when the caller
         doesn't specify or select a device.
+
+        Raises:
+            MultipleDevicesError: Multiple devices connected without selection.
         """
-        return self.resolve_device_id(device_id) or "default"
+        resolved = self._resolve_device_id_with_policy(device_id)
+        return resolved or "default"
 
     @contextlib.contextmanager
     def get_device(
@@ -243,9 +281,10 @@ class DeviceManager:
             InvalidDeviceIdError: Invalid device ID format
             DeviceConnectionError: Connection failed
             DeviceNotFoundError: No devices available
+            MultipleDevicesError: Multiple devices connected without selection
         """
         # Resolve device ID
-        resolved_id = self.resolve_device_id(device_id)
+        resolved_id = self._resolve_device_id_with_policy(device_id)
 
         # Validate
         if not validate_device_id(resolved_id):
@@ -264,16 +303,14 @@ class DeviceManager:
 
                     # Check if any device is available when using default
                     if resolved_id is None:
-                        devices = self.get_available_devices()
-                        if not devices:
-                            raise DeviceNotFoundError()
+                        raise DeviceNotFoundError()
 
                     # Evict oldest if at capacity
                     self._evict_oldest_if_needed()
 
                     device = u2.connect(resolved_id)
                     self._cache[cache_key] = CachedDevice(device=device)
-                except DeviceNotFoundError:
+                except (DeviceNotFoundError, MultipleDevicesError):
                     raise
                 except Exception as e:
                     logger.error(f"Failed to connect to device: {e}")
