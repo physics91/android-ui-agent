@@ -20,9 +20,17 @@ MAX_EVENTS_PER_RECORDING = 5000
 MAX_PLAYBACK_TIME_SECONDS = 600  # 10 minutes
 
 
-def _execute_event(device, event: "GestureEvent") -> None:
+def _execute_event(
+    device,
+    event: "GestureEvent",
+    screen_size: Optional[tuple[int, int]] = None,
+) -> None:
     """Execute a single recorded event against the device."""
-    params = event.params
+    params = (
+        _apply_coordinate_space(event.params, screen_size)
+        if screen_size is not None
+        else event.params
+    )
     if event.type == "tap":
         device.click(int(params.get("x", 0)), int(params.get("y", 0)))
     elif event.type == "double_tap":
@@ -315,6 +323,7 @@ class RecordingManager:
 
         try:
             with device_manager.get_device(target_device) as device:
+                screen_size = device.window_size()
                 last_timestamp = 0
 
                 for event in recording.events:
@@ -325,7 +334,7 @@ class RecordingManager:
                     last_timestamp = event.timestamp
 
                     try:
-                        _execute_event(device, event)
+                        _execute_event(device, event, screen_size=screen_size)
 
                         events_played += 1
 
