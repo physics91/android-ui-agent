@@ -374,6 +374,8 @@ def _build_gesture_params(
     text: Optional[str] = None,
     key: Optional[str] = None,
     duration: Optional[float] = None,
+    coordinate_space: Optional[str] = None,
+    normalized: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """Build parameter payload for a gesture event."""
     params: Dict[str, Any] = {}
@@ -391,12 +393,50 @@ def _build_gesture_params(
         params["key"] = key
     if duration is not None:
         params["duration"] = duration
+    if coordinate_space is None:
+        if normalized is True:
+            coordinate_space = "normalized"
+        elif normalized is False:
+            coordinate_space = "absolute"
+    if coordinate_space is not None:
+        params["coordinate_space"] = coordinate_space
 
     if event_type == "swipe":
         params["start_x"] = params.pop("x", 0)
         params["start_y"] = params.pop("y", 0)
 
     return params
+
+
+def _apply_coordinate_space(
+    params: Dict[str, Any],
+    screen_size: Optional[tuple[int, int]],
+) -> Dict[str, Any]:
+    """Scale normalized coordinates into absolute pixels and clamp to screen size."""
+    if params.get("coordinate_space") != "normalized":
+        return dict(params)
+    if screen_size is None:
+        return dict(params)
+
+    width, height = screen_size
+
+    def _scale(value: Any, size: int) -> int:
+        if size <= 0:
+            return 0
+        try:
+            scaled = int(round(float(value) * size))
+        except (TypeError, ValueError):
+            return 0
+        return max(0, min(size - 1, scaled))
+
+    scaled = dict(params)
+    for key in ("x", "start_x", "end_x"):
+        if key in scaled:
+            scaled[key] = _scale(scaled[key], width)
+    for key in ("y", "start_y", "end_y"):
+        if key in scaled:
+            scaled[key] = _scale(scaled[key], height)
+    return scaled
 
 
 # === MCP Tool Functions ===
