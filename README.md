@@ -1,31 +1,17 @@
 # Android UI Agent MCP Server
 
-AI 에이전트가 Android 화면을 직접 "볼 수 있게" 해주는 최소 MCP 서버
+uiautomator2 기반 Android UI 자동화를 MCP 도구로 제공합니다.
 
-## 설계 철학
-
-- **MCP 서버** = "눈" (화면 데이터 전달)
-- **AI 에이전트** = "두뇌" (분석, 판단, 수정 모두 담당)
-
-MCP는 오직 **화면 데이터를 AI에게 직접 전달**하는 역할만 수행합니다.
-
-## 도구 (2개만!)
-
-| Tool | 설명 | 반환값 |
-|------|------|--------|
-| `capture_screenshot` | 스크린샷 캡처 | base64 PNG 이미지 |
-| `dump_ui_hierarchy` | UI 계층 구조 추출 | XML 문자열 |
-
-## 설치
+## Quickstart
 
 ```bash
 cd /home/physics91/dev/android-tester
 pip install -e .
+adb devices
+python src/server.py
 ```
 
-## Claude Code 설정
-
-`~/.claude/settings.json`:
+MCP 클라이언트 설정 예시 (Claude Code):
 
 ```json
 {
@@ -38,19 +24,21 @@ pip install -e .
 }
 ```
 
-## 사용 예시
+기본 사용 흐름:
+1. `device_list`로 디바이스 확인
+2. `device_snapshot`으로 UI 스냅샷/refs 획득
+3. `device_tap`, `device_type` 등으로 상호작용
 
-Claude Code에서 자연어로 요청:
+## MCP 툴 목록
 
-```
-"연결된 안드로이드 디바이스의 스크린샷을 캡처하고 UI 문제를 분석해줘"
-```
-
-AI 에이전트가:
-1. `capture_screenshot()` → base64 이미지 반환
-2. AI Vision으로 직접 분석 → "버튼이 너무 작습니다"
-3. `dump_ui_hierarchy()` → XML 반환
-4. AI가 XML에서 요소 정보 파악 → "btn_submit의 bounds=[100,200][136,232]"
+- Device: `device_list`(연결 목록), `device_select`(기본 지정), `device_info`(정보), `device_unlock`(잠금 해제)
+- Snapshot & Find: `device_snapshot`(UI 스냅샷+refs), `screenshot`(base64 PNG), `find_element`(조건 검색)
+- Interaction: `device_tap`, `device_double_tap`, `device_long_press`, `device_type`, `device_swipe`, `clear_text`
+- Navigation: `app_start`, `app_stop`, `app_current`, `go_back`, `go_home`, `press_key`, `open_notification`, `open_quick_settings`, `set_orientation`
+- Wait: `wait_seconds`, `wait_for_element`, `wait_for_text`, `wait_for_activity`, `wait_for_element_gone`
+- Watchers: `watcher_add`, `watcher_remove`, `watcher_list`, `watcher_start`, `watcher_stop`, `watcher_trigger_once`
+- Recording: `start_gesture_recording`, `add_gesture_event`, `stop_gesture_recording`, `play_gesture_recording`, `list_gesture_recordings`, `export_gesture_recording`, `import_gesture_recording`, `delete_gesture_recording`
+- Performance: `get_performance_metrics`, `start_performance_monitor`, `stop_performance_monitor`
 
 ## 의존성
 
