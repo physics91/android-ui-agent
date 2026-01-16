@@ -225,7 +225,7 @@ class WatcherManager:
 
         return None
 
-    def _watcher_loop(self, device_id: str):
+    def _watcher_loop(self, device_id: str, poll_interval: float):
         """Background loop that checks watchers."""
         logger.info(f"Watcher loop started for device '{device_id}'")
         consecutive_errors = 0
@@ -249,7 +249,7 @@ class WatcherManager:
                     )
                     break
 
-            time.sleep(self._poll_interval)
+            time.sleep(poll_interval)
 
         # Cleanup on exit
         with self._lock:
@@ -266,16 +266,17 @@ class WatcherManager:
         Returns:
             True if started
         """
+        if poll_interval <= 0:
+            raise ValueError("poll_interval must be greater than 0")
         with self._lock:
             if self._running.get(device_id, False):
                 return False  # Already running
 
-            self._poll_interval = poll_interval
             self._running[device_id] = True
 
             thread = threading.Thread(
                 target=self._watcher_loop,
-                args=(device_id,),
+                args=(device_id, poll_interval),
                 daemon=True,
                 name=f"watcher-{device_id}",
             )

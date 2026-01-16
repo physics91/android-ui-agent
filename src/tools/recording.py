@@ -20,9 +20,17 @@ MAX_EVENTS_PER_RECORDING = 5000
 MAX_PLAYBACK_TIME_SECONDS = 600  # 10 minutes
 
 
-def _execute_event(device, event: "GestureEvent") -> None:
+def _execute_event(
+    device,
+    event: "GestureEvent",
+    screen_size: Optional[tuple[int, int]] = None,
+) -> None:
     """Execute a single recorded event against the device."""
-    params = event.params
+    params = (
+        _apply_coordinate_space(event.params, screen_size)
+        if screen_size is not None
+        else event.params
+    )
     if event.type == "tap":
         device.click(int(params.get("x", 0)), int(params.get("y", 0)))
     elif event.type == "double_tap":
@@ -81,7 +89,7 @@ class RecordingManager:
         self,
         device_id: str,
         metadata: Optional[Dict[str, Any]] = None,
-    ) -> GestureRecording:
+    ) -> Optional[GestureRecording]:
         """Start a new gesture recording.
 
         Args:
@@ -91,16 +99,6 @@ class RecordingManager:
         Returns:
             New GestureRecording
         """
-        recording_id = f"rec_{uuid.uuid4().hex[:12]}"
-
-        recording = GestureRecording(
-            recording_id=recording_id,
-            device_id=device_id,
-            start_time=time.time(),
-            metadata=metadata or {},
-            is_recording=True,
-        )
-
         with self._lock:
             # Limit total recordings to prevent unbounded memory growth
             if len(self._recordings) >= MAX_RECORDINGS:
@@ -111,10 +109,26 @@ class RecordingManager:
                 ]
                 # Sort by start_time (oldest first)
                 completed.sort(key=lambda x: x[1].start_time)
-                # Remove oldest until under limit
-                for rid, _ in completed[:len(self._recordings) - MAX_RECORDINGS + 1]:
-                    self._recordings.pop(rid, None)
-                    logger.debug(f"Evicted old recording: {rid}")
+                if completed:
+                    # Remove oldest until under limit
+                    for rid, _ in completed[:len(self._recordings) - MAX_RECORDINGS + 1]:
+                        self._recordings.pop(rid, None)
+                        logger.debug(f"Evicted old recording: {rid}")
+                else:
+                    logger.warning(
+                        "Recording limit reached; no completed recordings to evict"
+                    )
+                    return None
+
+            recording_id = f"rec_{uuid.uuid4().hex[:12]}"
+
+            recording = GestureRecording(
+                recording_id=recording_id,
+                device_id=device_id,
+                start_time=time.time(),
+                metadata=metadata or {},
+                is_recording=True,
+            )
 
             self._recordings[recording_id] = recording
             self._active[device_id] = recording_id
@@ -315,9 +329,10 @@ class RecordingManager:
 
         try:
             with device_manager.get_device(target_device) as device:
+                screen_size = device.window_size()
                 last_timestamp = 0
 
-                for event in recording.events:
+                for event_index, event in enumerate(recording.events):
                     # Wait for correct timing
                     delay = (event.timestamp - last_timestamp) / speed
                     if delay > 0:
@@ -325,12 +340,12 @@ class RecordingManager:
                     last_timestamp = event.timestamp
 
                     try:
-                        _execute_event(device, event)
+                        _execute_event(device, event, screen_size=screen_size)
 
                         events_played += 1
 
                     except Exception as e:
-                        errors.append({"event_index": events_played, "error": str(e)})
+                        errors.append({"event_index": event_index, "error": str(e)})
 
         except DeviceConnectionError:
             raise
@@ -374,6 +389,8 @@ def _build_gesture_params(
     text: Optional[str] = None,
     key: Optional[str] = None,
     duration: Optional[float] = None,
+    coordinate_space: Optional[str] = None,
+    normalized: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """Build parameter payload for a gesture event."""
     params: Dict[str, Any] = {}
@@ -391,12 +408,50 @@ def _build_gesture_params(
         params["key"] = key
     if duration is not None:
         params["duration"] = duration
+    if coordinate_space is None:
+        if normalized is True:
+            coordinate_space = "normalized"
+        elif normalized is False:
+            coordinate_space = "absolute"
+    if coordinate_space is not None:
+        params["coordinate_space"] = coordinate_space
 
     if event_type == "swipe":
         params["start_x"] = params.pop("x", 0)
         params["start_y"] = params.pop("y", 0)
 
     return params
+
+
+def _apply_coordinate_space(
+    params: Dict[str, Any],
+    screen_size: Optional[tuple[int, int]],
+) -> Dict[str, Any]:
+    """Scale normalized coordinates into absolute pixels and clamp to screen size."""
+    if params.get("coordinate_space") != "normalized":
+        return dict(params)
+    if screen_size is None:
+        return dict(params)
+
+    width, height = screen_size
+
+    def _scale(value: Any, size: int) -> int:
+        if size <= 0:
+            return 0
+        try:
+            scaled = int(round(float(value) * size))
+        except (TypeError, ValueError):
+            return 0
+        return max(0, min(size - 1, scaled))
+
+    scaled = dict(params)
+    for key in ("x", "start_x", "end_x"):
+        if key in scaled:
+            scaled[key] = _scale(scaled[key], width)
+    for key in ("y", "start_y", "end_y"):
+        if key in scaled:
+            scaled[key] = _scale(scaled[key], height)
+    return scaled
 
 
 # === MCP Tool Functions ===
@@ -421,6 +476,12 @@ def start_gesture_recording(
     manager = get_recording_manager()
     recording = manager.start_recording(resolved_id, metadata)
 
+    if recording is None:
+        return {
+            "success": False,
+            "error": "Recording limit reached",
+        }
+
     return {
         "success": True,
         "recording_id": recording.recording_id,
@@ -438,6 +499,8 @@ def add_gesture_event(
     text: Optional[str] = None,
     key: Optional[str] = None,
     duration: Optional[float] = None,
+    coordinate_space: Optional[str] = None,
+    normalized: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """Add a gesture event to recording.
 
@@ -449,6 +512,8 @@ def add_gesture_event(
         text: Text for type event
         key: Key name for key event
         duration: Duration for long_press or swipe
+        coordinate_space: "absolute" (pixels) or "normalized" (0-1)
+        normalized: Convenience flag; True maps to coordinate_space="normalized"
 
     Returns:
         Dictionary with success status
@@ -464,6 +529,8 @@ def add_gesture_event(
         text=text,
         key=key,
         duration=duration,
+        coordinate_space=coordinate_space,
+        normalized=normalized,
     )
 
     added = manager.add_event(recording_id, event_type, params)
