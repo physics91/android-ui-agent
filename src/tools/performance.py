@@ -149,6 +149,7 @@ class MonitoringSession:
     device_id: str
     package: str
     start_time: float
+    poll_interval: float
     snapshots: List[PerformanceSnapshot] = field(default_factory=list)
     is_running: bool = False
 
@@ -203,6 +204,7 @@ class PerformanceMonitor:
         session_id: str,
         device_id: str,
         package: str,
+        poll_interval: float,
     ):
         """Background monitoring loop."""
         logger.info(f"Monitoring started for session '{session_id}'")
@@ -224,7 +226,7 @@ class PerformanceMonitor:
             except Exception as e:
                 logger.warning(f"Monitoring error: {e}")
 
-            time.sleep(self._poll_interval)
+            time.sleep(poll_interval)
 
         logger.info(f"Monitoring stopped for session '{session_id}'")
 
@@ -246,6 +248,9 @@ class PerformanceMonitor:
         """
         import uuid
 
+        if poll_interval <= 0:
+            raise ValueError("poll_interval must be greater than 0")
+
         device_manager = get_device_manager()
 
         # Get current package if not specified
@@ -260,6 +265,7 @@ class PerformanceMonitor:
             device_id=device_id,
             package=package,
             start_time=time.time(),
+            poll_interval=poll_interval,
             is_running=True,
         )
 
@@ -282,7 +288,7 @@ class PerformanceMonitor:
 
         thread = threading.Thread(
             target=self._monitor_loop,
-            args=(session_id, device_id, package),
+            args=(session_id, device_id, package, poll_interval),
             daemon=True,
             name=f"perf-{session_id}",
         )
