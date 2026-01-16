@@ -89,7 +89,7 @@ class RecordingManager:
         self,
         device_id: str,
         metadata: Optional[Dict[str, Any]] = None,
-    ) -> GestureRecording:
+    ) -> Optional[GestureRecording]:
         """Start a new gesture recording.
 
         Args:
@@ -99,16 +99,6 @@ class RecordingManager:
         Returns:
             New GestureRecording
         """
-        recording_id = f"rec_{uuid.uuid4().hex[:12]}"
-
-        recording = GestureRecording(
-            recording_id=recording_id,
-            device_id=device_id,
-            start_time=time.time(),
-            metadata=metadata or {},
-            is_recording=True,
-        )
-
         with self._lock:
             # Limit total recordings to prevent unbounded memory growth
             if len(self._recordings) >= MAX_RECORDINGS:
@@ -119,10 +109,26 @@ class RecordingManager:
                 ]
                 # Sort by start_time (oldest first)
                 completed.sort(key=lambda x: x[1].start_time)
-                # Remove oldest until under limit
-                for rid, _ in completed[:len(self._recordings) - MAX_RECORDINGS + 1]:
-                    self._recordings.pop(rid, None)
-                    logger.debug(f"Evicted old recording: {rid}")
+                if completed:
+                    # Remove oldest until under limit
+                    for rid, _ in completed[:len(self._recordings) - MAX_RECORDINGS + 1]:
+                        self._recordings.pop(rid, None)
+                        logger.debug(f"Evicted old recording: {rid}")
+                else:
+                    logger.warning(
+                        "Recording limit reached; no completed recordings to evict"
+                    )
+                    return None
+
+            recording_id = f"rec_{uuid.uuid4().hex[:12]}"
+
+            recording = GestureRecording(
+                recording_id=recording_id,
+                device_id=device_id,
+                start_time=time.time(),
+                metadata=metadata or {},
+                is_recording=True,
+            )
 
             self._recordings[recording_id] = recording
             self._active[device_id] = recording_id
@@ -326,7 +332,7 @@ class RecordingManager:
                 screen_size = device.window_size()
                 last_timestamp = 0
 
-                for event in recording.events:
+                for event_index, event in enumerate(recording.events):
                     # Wait for correct timing
                     delay = (event.timestamp - last_timestamp) / speed
                     if delay > 0:
@@ -339,7 +345,7 @@ class RecordingManager:
                         events_played += 1
 
                     except Exception as e:
-                        errors.append({"event_index": events_played, "error": str(e)})
+                        errors.append({"event_index": event_index, "error": str(e)})
 
         except DeviceConnectionError:
             raise
@@ -469,6 +475,12 @@ def start_gesture_recording(
 
     manager = get_recording_manager()
     recording = manager.start_recording(resolved_id, metadata)
+
+    if recording is None:
+        return {
+            "success": False,
+            "error": "Recording limit reached",
+        }
 
     return {
         "success": True,
