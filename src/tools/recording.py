@@ -499,6 +499,8 @@ def add_gesture_event(
     text: Optional[str] = None,
     key: Optional[str] = None,
     duration: Optional[float] = None,
+    coordinate_space: Optional[str] = None,
+    normalized: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """Add a gesture event to recording.
 
@@ -510,6 +512,8 @@ def add_gesture_event(
         text: Text for type event
         key: Key name for key event
         duration: Duration for long_press or swipe
+        coordinate_space: "absolute" (pixels) or "normalized" (0-1)
+        normalized: Convenience flag; True maps to coordinate_space="normalized"
 
     Returns:
         Dictionary with success status
@@ -525,6 +529,8 @@ def add_gesture_event(
         text=text,
         key=key,
         duration=duration,
+        coordinate_space=coordinate_space,
+        normalized=normalized,
     )
 
     added = manager.add_event(recording_id, event_type, params)
