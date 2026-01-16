@@ -38,3 +38,6 @@ Thumbs.db
 local.properties
 *.apk
 *.aab
+
+# Git worktrees
+.worktrees/
